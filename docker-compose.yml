@@ -1,0 +1,107 @@
+services:
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    hostname: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092'
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+    networks:
+      - fraud-net
+    healthcheck:
+      test: ["CMD-SHELL", "bash -lc 'kafka-topics --bootstrap-server localhost:9092 --list > /dev/null 2>&1'"]
+      interval: 5s
+      timeout: 10s
+      retries: 24
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - fraud-net
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: fraud_pass
+      POSTGRES_DB: frauddb
+      POSTGRES_USER: fraud_user
+    volumes:
+      - ./infra/schema.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - fraud-net
+
+  model-api:
+    build: ./model-api
+    ports:
+      - "8000:8000"
+    networks:
+      - fraud-net
+    volumes:
+      - ./model-api/threshold.json:/app/threshold.json:ro
+      - ./model-api/model.pkl:/app/model.pkl:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  consumer-service:
+    build: ./consumer-service
+    restart: unless-stopped
+    environment:
+      TXN_TOPIC: transactions
+    depends_on:
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
+      model-api:
+        condition: service_started
+    ports:
+      - "8081:8081"
+    networks:
+      - fraud-net
+
+  producer:
+    build: ./producer
+    environment:
+      PYTHONUNBUFFERED: "1"
+      FRAUD_RATE: 0.02
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    networks:
+      - fraud-net
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+    command: >
+      bash -lc "kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic transactions --partitions 1 --replication-factor 1 && sleep 1"
+    networks:
+      - fraud-net
+
+networks:
+  fraud-net:
+    driver: bridge
