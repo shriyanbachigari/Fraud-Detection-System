@@ -2,6 +2,8 @@
 
 Small end-to-end demo I built to stream fake transactions through Kafka, score them with a simple model, and show live fraud alerts in a tiny dashboard.
 
+![Dashboard screenshot](screenshots/FraudDetectionUI.png)
+
 ## What’s inside
 
 - Producer (Python): publishes fake transactions to Kafka (`transactions` topic)
@@ -27,7 +29,7 @@ docker compose up -d --build
 Give it ~10–20 seconds. Then:
 
 - Dashboard: open http://localhost:8081/ (live fraud alerts)
-- Model health: 
+- Model health:
 	```powershell
 	curl.exe http://localhost:8000/health
 	```
@@ -53,4 +55,3 @@ Features sent to the model:
 - country_novelty (0/1)
 - device_novelty (0/1)
 - user_velocity_60s (int)
-

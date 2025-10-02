@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Fraud Alerts</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 16px; }
+    h2 { margin: 0 0 10px; }
+    #status { color: #666; margin-bottom: 10px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 8px; font-size: 14px; }
+    th { background: #222; color: #fff; }
+    tr:nth-child(even) { background: #f9f9f9; }
+    .score { font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h2>Fraud Alerts (Live)</h2>
+  <div id="status">connecting...</div>
+  <table id="tbl">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Txn</th>
+        <th>Score</th>
+        <th>Reasons</th>
+        <th>Time</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    const tbody = document.querySelector('#tbl tbody');
+    const statusEl = document.getElementById('status');
+
+    function addRow(d) {
+      const tr = document.createElement('tr');
+      const score = Number(d.score ?? 0).toFixed(3);
+      tr.innerHTML = `
+        <td>${d.id ?? ''}</td>
+        <td>${d.txn_id ?? ''}</td>
+        <td class="score">${score}</td>
+        <td>${(d.reasons_json || '').toString().slice(0, 200)}</td>
+        <td>${d.timestamp ?? d.created_at ?? ''}</td>
+      `;
+      tbody.prepend(tr);
+      while (tbody.rows.length > 200) tbody.deleteRow(-1);
+    }
+
+    function connect() {
+      statusEl.textContent = 'connecting...';
+      const es = new EventSource('/alerts/stream');
+      es.onopen = () => statusEl.textContent = 'live';
+      es.onmessage = (e) => {
+        try { addRow(JSON.parse(e.data)); } catch {}
+      };
+      es.onerror = () => {
+        statusEl.textContent = 'disconnected, retrying...';
+        es.close();
+        setTimeout(connect, 1500);
+      };
+    }
+    connect();
+  </script>
+</body>
+</html>

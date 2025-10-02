@@ -1,0 +1,10 @@
+com\frauddetection\consumer\TransactionConsumer.class
+com\frauddetection\model\Transaction.class
+com\frauddetection\service\ModelClient$ModelScore.class
+com\frauddetection\service\VelocityService.class
+com\frauddetection\ConsumerApplication.class
+com\frauddetection\service\ModelClient.class
+com\frauddetection\web\AlertStreamController.class
+com\frauddetection\model\FraudFlag.class
+com\frauddetection\repository\TransactionRepository.class
+com\frauddetection\repository\FraudFlagRepository.class
